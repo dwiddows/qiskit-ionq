@@ -32,6 +32,7 @@ to IonQ REST API compatible values.
 import json
 import gzip
 import base64
+import string
 
 from qiskit.circuit import controlledgate as q_cgates
 from qiskit.circuit.library import standard_gates as q_gates
@@ -43,6 +44,7 @@ from . import exceptions
 # also not an exact/complete list of the gates IonQ's backend takes
 #   by name — please refer to IonQ docs for that.
 ionq_basis_gates = [
+    "c3rx", "c4rx",  # Experiment to consider ease / accuracy of extending in this way.
     "ccx",
     "ch",
     "cnot",
@@ -176,6 +178,8 @@ def qiskit_circ_to_ionq_circ(input_circuit):
         # If this is a controlled gate, make sure to set control qubits.
         if isinstance(instruction, q_cgates.ControlledGate):
             gate = instruction_name[1:]  # trim the leading c
+            while gate[0].isdigit():     # trim leading numbers, eg., '3rx' -> 'rx', initially from 'c3rx'.
+                gate = gate[1:]
             controls = [input_circuit.qubits.index(qargs[0])]
             targets = [input_circuit.qubits.index(qargs[1])]
             # If this is a multi-control, use more than one qubit.

@@ -27,7 +27,10 @@
 """Test the qobj_to_ionq function."""
 
 import pytest
+
 from qiskit.circuit import QuantumCircuit, QuantumRegister, ClassicalRegister, instruction
+from qiskit.circuit.library import MCMT
+from qiskit.extensions import RXGate, UnitaryGate
 
 from qiskit_ionq import exceptions
 from qiskit_ionq.helpers import qiskit_circ_to_ionq_circ
@@ -166,7 +169,6 @@ def test_simple_circuit():
     assert built == expected
 
 
-# pylint: disable=invalid-name
 def test_circuit_with_entangling_ops():
     """Test structure of circuits with entangling ops."""
     qc = QuantumCircuit(2, 2)
@@ -176,11 +178,39 @@ def test_circuit_with_entangling_ops():
     assert built == expected
 
 
-def test_multi_control():
-    """Test structure of circuits with multiple controls"""
+def test_simple_circuit_with_arbitrary_unitary():
+    """Test circuit with unitary gate -- showing that this is not yet supported"""
+    qc = QuantumCircuit(1)
+    my_gate = UnitaryGate([[0, 1j], [1j, 0]])
+    qc.append(my_gate, [0])
+    # The 'unitary' gate type isn't recognized yet.
+    with pytest.raises(exceptions.IonQGateError):
+        qiskit_circ_to_ionq_circ(qc)
+
+    # Note that the 'append' call is compatible with qiskit_circ_to_ionq_circ
+    # so long as the gate is recognized.
+    qc = QuantumCircuit(1)
+    qc.append(RXGate(1), [0])
+    expected = [{'gate': 'rx', 'rotation': 1.0, 'targets': [0]}]
+    built, _, _ = qiskit_circ_to_ionq_circ(qc)
+    assert built == expected
+
+
+def test_multi_control_toffoli():
+    """Test structure of circuits with multiple controls using a toffoli gate"""
     qc = QuantumCircuit(3, 3)
     qc.toffoli(0, 1, 2)
     expected = [{"gate": "x", "targets": [2], "controls": [0, 1]}]
+    built, _, _ = qiskit_circ_to_ionq_circ(qc)
+    assert built == expected
+
+
+def test_multi_control_rotation():
+    """Test structure of circuits with multiple controls"""
+    qc = QuantumCircuit(5, 3)
+    multi_control_rotation = MCMT(RXGate(1), 3, 1)
+    qc = qc.compose(multi_control_rotation, qubits=[0, 1, 2, 3])
+    expected = [{'controls': [0, 1, 2], 'gate': 'rx', 'rotation': 1.0, 'targets': [3]}]
     built, _, _ = qiskit_circ_to_ionq_circ(qc)
     assert built == expected
 
